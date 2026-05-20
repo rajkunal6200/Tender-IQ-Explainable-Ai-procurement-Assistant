@@ -2,11 +2,11 @@ import { FileText, Users, CheckSquare, Clock, LayoutDashboard, Upload, UserCheck
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'tenders', label: 'Tender Upload', icon: Upload },
-  { id: 'bidders', label: 'Bidder Docs', icon: Users },
-  { id: 'evaluation', label: 'Evaluation', icon: ClipboardCheck },
-  { id: 'consolidated', label: 'Summary Report', icon: FileText },
-  { id: 'audit', label: 'Audit Trail', icon: Clock },
+  { id: 'tenders', label: 'Job Descriptions', icon: Upload },
+  { id: 'bidders', label: 'Candidates & Resumes', icon: Users },
+  { id: 'evaluation', label: 'Resume Evaluation', icon: ClipboardCheck },
+  { id: 'consolidated', label: 'Candidate Rankings', icon: FileText },
+  { id: 'audit', label: 'Activity Log', icon: Clock },
 ];
 
 export default function Sidebar({ activePage, onNavigate }) {
@@ -18,8 +18,8 @@ export default function Sidebar({ activePage, onNavigate }) {
              <Shield size={28} color="#6366f1" />
           </div>
           <div className="logo-text">
-            <span className="logo-name">CRPF TenderIQ</span>
-            <span className="logo-tagline">AI Procurement</span>
+            <span className="logo-name">Resume Evaluator</span>
+            <span className="logo-tagline">AI Applicant Tracking</span>
           </div>
         </div>
       </div>
@@ -40,10 +40,10 @@ export default function Sidebar({ activePage, onNavigate }) {
 
       <div className="sidebar-footer">
         <div className="user-profile">
-          <div className="user-avatar">CP</div>
+          <div className="user-avatar">HR</div>
           <div className="user-info">
-            <span className="user-name">CRPF Officer</span>
-            <span className="user-role">Evaluation Committee</span>
+            <span className="user-name">HR Officer</span>
+            <span className="user-role">Recruiting Committee</span>
           </div>
         </div>
       </div>

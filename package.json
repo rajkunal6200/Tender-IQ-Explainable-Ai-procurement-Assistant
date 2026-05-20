@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:frontend": "vite",
-    "dev:backend": "cd backend && uvicorn backend.app.main:app --reload",
+    "dev:backend": "python3 -m uvicorn backend.app.main:app --reload --port 8002",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -82,9 +82,21 @@ export const api = {
     return response.json();
   },
 
-  seedData: async () => {
-    const response = await fetch(`${API_BASE_URL}/seed`, { method: 'POST' });
-    if (!response.ok) throw new Error('Failed to seed data');
+  deleteTender: async (tenderId) => {
+    const response = await fetch(`${API_BASE_URL}/tenders/${tenderId}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Failed to delete tender');
+    return response.json();
+  },
+
+  deleteBidder: async (bidderId) => {
+    const response = await fetch(`${API_BASE_URL}/bidders/${bidderId}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Failed to delete bidder');
+    return response.json();
+  },
+
+  deleteEvaluation: async (evalId) => {
+    const response = await fetch(`${API_BASE_URL}/evaluations/${evalId}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Failed to delete evaluation');
     return response.json();
   }
 };

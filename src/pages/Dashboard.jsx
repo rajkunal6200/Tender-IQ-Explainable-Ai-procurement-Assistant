@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, CheckCircle, AlertTriangle, ArrowUpRight, ArrowDownRight, Upload, Eye } from 'lucide-react';
+import { FileText, Users, CheckCircle, AlertTriangle, ArrowUpRight, ArrowDownRight, Upload, Eye, Trash2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { api } from '../utils/api';
 import { dashboardStats, evaluationSummary, weeklyActivity } from '../data/mockData';
@@ -11,6 +11,17 @@ export default function Dashboard({ onNavigate, search }) {
   const [tenders, setTenders] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const handleDeleteTender = async (tenderId) => {
+    if (!window.confirm('Delete this job description and all related candidates?')) return;
+    try {
+      await api.deleteTender(tenderId);
+      setTenders(prev => prev.filter(t => t.id !== tenderId));
+    } catch (error) {
+      console.error('Failed to delete job description:', error);
+      alert('Error deleting job description.');
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -30,7 +41,7 @@ export default function Dashboard({ onNavigate, search }) {
     fetchData();
   }, []);
 
-  if (loading) return <div className="fade-in" style={{ display: 'flex', justifyContent: 'center', padding: '100px' }}>Loading CRPF Dashboard...</div>;
+  if (loading) return <div className="fade-in" style={{ display: 'flex', justifyContent: 'center', padding: '100px' }}>Loading Resume Evaluator Dashboard...</div>;
 
   const filteredTenders = tenders.filter(t => 
     t.title.toLowerCase().includes((search || '').toLowerCase()) || 
@@ -41,17 +52,17 @@ export default function Dashboard({ onNavigate, search }) {
     <div className="fade-in">
       {/* Stats Grid */}
       <div className="stats-grid">
-        <StatCard icon={<FileText size={20}/>} color="purple" label="Active Tenders" value={tenders.length} change="+2" trend="up" />
-        <StatCard icon={<Users size={20}/>} color="cyan" label="Bidders Evaluated" value="10" change="+12%" trend="up" />
-        <StatCard icon={<CheckCircle size={20}/>} color="green" label="Clearly Eligible" value="6" change="+5" trend="up" />
-        <StatCard icon={<AlertTriangle size={20}/>} color="yellow" label="Review Flagged" value="1" change="-2" trend="down" />
+        <StatCard icon={<FileText size={20}/>} color="purple" label="Active Jobs" value={tenders.length} change="+1" trend="up" />
+        <StatCard icon={<Users size={20}/>} color="cyan" label="Candidates Evaluated" value="3" change="+3" trend="up" />
+        <StatCard icon={<CheckCircle size={20}/>} color="green" label="Highly Qualified (80%+)" value="1" change="+1" trend="up" />
+        <StatCard icon={<AlertTriangle size={20}/>} color="yellow" label="Borderline Matches" value="2" change="+2" trend="up" />
       </div>
 
       {/* Charts Row */}
       <div className="grid-3">
         <div className="card">
           <div className="section-header">
-            <div><div className="section-title">Weekly Activity</div><div className="section-subtitle">Uploads & Evaluations</div></div>
+            <div><div className="section-title">Weekly Activity</div><div className="section-subtitle">Resume Uploads & ATS Runs</div></div>
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height="100%">
@@ -60,7 +71,7 @@ export default function Dashboard({ onNavigate, search }) {
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
                 <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12, color: '#f1f5f9' }} />
                 <Bar dataKey="uploads" fill="#6366f1" radius={[4,4,0,0]} name="Uploads" />
-                <Bar dataKey="evaluations" fill="#06b6d4" radius={[4,4,0,0]} name="Evaluations" />
+                <Bar dataKey="evaluations" fill="#06b6d4" radius={[4,4,0,0]} name="ATS Runs" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -93,12 +104,12 @@ export default function Dashboard({ onNavigate, search }) {
       <div className="grid-2">
         <div className="card">
           <div className="section-header">
-            <div><div className="section-title">Recent Tenders</div></div>
+            <div><div className="section-title">Active Job Descriptions</div></div>
             <button className="btn btn-secondary btn-sm" onClick={() => onNavigate('tenders')}>View All</button>
           </div>
           <div className="table-container">
             <table>
-              <thead><tr><th>Tender</th><th>Department</th><th>Status</th><th>Value</th></tr></thead>
+              <thead><tr><th>Job Title</th><th>Department</th><th>Status</th><th>Salary Range</th><th>Action</th></tr></thead>
               <tbody>
                 {filteredTenders.map(t => (
                   <tr key={t.id}>
@@ -106,6 +117,11 @@ export default function Dashboard({ onNavigate, search }) {
                     <td style={{ fontSize: '0.8rem' }}>{t.department}</td>
                     <td><span className={`badge ${statusColors[t.status]}`}>{statusLabels[t.status]}</span></td>
                     <td style={{ fontSize: '0.85rem' }}>{t.value}</td>
+                    <td>
+                      <button className="btn btn-danger btn-sm" style={{ minWidth: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => handleDeleteTender(t.id)}>
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

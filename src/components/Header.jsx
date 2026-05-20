@@ -3,11 +3,12 @@ import { Search, Bell, Clock, AlertTriangle, FileText, CheckCircle } from 'lucid
 import { api } from '../utils/api';
 
 const pageTitles = {
-  dashboard: 'Dashboard',
-  tenders: 'Tender Upload',
-  bidders: 'Bidder Documents',
-  evaluation: 'Eligibility Analysis',
-  audit: 'Audit Trail',
+  dashboard: 'Recruitment Dashboard',
+  tenders: 'Job Descriptions',
+  bidders: 'Candidates & Resumes',
+  evaluation: 'Resume ATS Evaluation',
+  consolidated: 'Candidate Rankings & Scores',
+  audit: 'Activity Log & Audits',
 };
 
 export default function Header({ activePage, onSearch }) {
@@ -31,16 +32,16 @@ export default function Header({ activePage, onSearch }) {
       <div className="header-left">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <h1 className="page-title">{pageTitles[activePage] || 'Dashboard'}</h1>
-          <span className="badge badge-red" style={{ fontSize: '0.6rem', letterSpacing: '0.05em' }}>OFFICIAL USE ONLY</span>
+          <span className="badge badge-red" style={{ fontSize: '0.6rem', letterSpacing: '0.05em' }}>INTERNAL HR USE ONLY</span>
         </div>
       </div>
       <div className="header-right">
         <div className="security-badge">
           <div className="security-status">
             <div className="status-dot pulse-red"></div>
-            <span>RESTRICTED ACCESS</span>
+            <span>CONFIDENTIAL ACCESS</span>
           </div>
-          <div className="security-label">CRPF CLASSIFIED // LEVEL 3</div>
+          <div className="security-label">HR RECRUITING // LEVEL 2</div>
         </div>
         <div className="search-box">
           <Search size={16} />

@@ -32,7 +32,7 @@ export default function AuditTrail() {
 
   const handleExport = () => {
     const csv = generateAuditCSV(filtered);
-    downloadBlob(csv, `CRPF_Audit_Trail_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
+    downloadBlob(csv, `Resume_Evaluator_Activity_Log_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
   };
 
   const filtered = auditLog.filter(log => {
@@ -52,7 +52,7 @@ export default function AuditTrail() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div className="section-title">Immutable Audit Trail</div>
-            <div className="section-subtitle">Every action is timestamped and traceable — CAG/RTI compliant</div>
+            <div className="section-subtitle">Every action is timestamped and traceable for full accountability</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary btn-sm" onClick={handleExport}><Download size={14}/> Export CSV</button>

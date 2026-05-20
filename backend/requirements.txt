@@ -1,9 +1,16 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
 pydantic
 python-multipart
 python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+psycopg2-binary
+# spaCy removed due to Python 3.9 compatibility; use a supported NLP engine if needed
+sentence-transformers
+scikit-learn
+langchain
 google-generativeai
 pymupdf
 pillow

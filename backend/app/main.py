@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 from typing import List
 import uvicorn
@@ -20,11 +21,12 @@ def calculate_hash(file_path):
 from .database import engine, get_db, Base
 from .models import models
 from .services import ai_service
+from .config import settings
 
 # Create tables
-models.Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="TenderIQ API")
+app = FastAPI(title="Resume Evaluator API")
 
 # Enable CORS
 app.add_middleware(
@@ -35,28 +37,142 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = "backend/uploads"
+UPLOAD_DIR = settings.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def ensure_sqlite_schema():
+    if not settings.DATABASE_URL.startswith("sqlite:///"):
+        return
+
+    db_file = settings.DATABASE_URL.replace("sqlite:///", "")
+    if not os.path.exists(db_file):
+        return
+
+    inspector = inspect(engine)
+    if not inspector.has_table("tenders"):
+        return
+
+    existing_columns = {col["name"] for col in inspector.get_columns("tenders")}
+    required_columns = {
+        "description_text",
+        "experience_summary",
+        "target_skills_json",
+        "ai_summary",
+        "score_weights",
+    }
+    if not required_columns.issubset(existing_columns):
+        backup_path = f"{db_file}.bak"
+        if not os.path.exists(backup_path):
+            os.rename(db_file, backup_path)
+        print(f"Outdated SQLite DB schema detected. Backed up old database to {backup_path} and recreating schema.")
+
+ensure_sqlite_schema()
+Base.metadata.create_all(bind=engine)
+
+
+def serialize_tender(tender: models.Tender):
+    return {
+        "id": tender.id,
+        "title": tender.title,
+        "department": tender.department,
+        "upload_date": tender.upload_date.isoformat() if tender.upload_date else None,
+        "status": tender.status,
+        "value": tender.value,
+        "required_docs": tender.required_docs or [],
+        "is_signed": tender.is_signed,
+        "signed_by": tender.signed_by,
+        "signed_at": tender.signed_at.isoformat() if tender.signed_at else None,
+        "description_text": tender.description_text,
+        "experience_summary": tender.experience_summary,
+        "target_skills_json": tender.target_skills_json,
+        "ai_summary": tender.ai_summary,
+        "score_weights": tender.score_weights,
+    }
+
+
+def serialize_criterion(criterion: models.Criterion):
+    return {
+        "id": criterion.id,
+        "tender_id": criterion.tender_id,
+        "category": criterion.category,
+        "name": criterion.name,
+        "threshold": criterion.threshold,
+        "mandatory": criterion.mandatory,
+        "source_page": criterion.source_page,
+        "source_text": criterion.source_text,
+    }
+
+
+def serialize_bidder(bidder: models.Bidder):
+    return {
+        "id": bidder.id,
+        "tender_id": bidder.tender_id,
+        "name": bidder.name,
+        "status": bidder.status,
+        "match_score": bidder.match_score,
+        "hidden_talent_score": bidder.hidden_talent_score,
+        "future_potential_score": bidder.future_potential_score,
+        "learning_ability_score": bidder.learning_ability_score,
+        "authenticity_score": bidder.authenticity_score,
+        "passion_score": bidder.passion_score,
+        "team_compatibility": bidder.team_compatibility,
+        "is_disqualified": bidder.is_disqualified,
+        "disqualification_reason": bidder.disqualification_reason,
+        "documents": bidder.documents or [],
+        "file_hashes": bidder.file_hashes or {},
+        "checklist_status": bidder.checklist_status or {},
+        "parsed_profile": bidder.parsed_profile,
+        "resume_text": bidder.resume_text,
+    }
+
+
+def serialize_evaluation(evaluation: models.Evaluation):
+    return {
+        "id": evaluation.id,
+        "bidder_id": evaluation.bidder_id,
+        "criterion_id": evaluation.criterion_id,
+        "verdict": evaluation.verdict,
+        "confidence": evaluation.confidence,
+        "match_type": evaluation.match_type,
+        "extracted_value": evaluation.extracted_value,
+        "reasoning": evaluation.reasoning,
+        "source_page": evaluation.source_page,
+        "source_document": evaluation.source_document,
+        "evidence_snippet": evaluation.evidence_snippet,
+        "action_required": evaluation.action_required,
+    }
+
+
+def serialize_audit_log(audit: models.AuditLog):
+    return {
+        "id": audit.id,
+        "timestamp": audit.timestamp.isoformat() if audit.timestamp else None,
+        "user": audit.user,
+        "action": audit.action,
+        "entity": audit.entity,
+        "details": audit.details,
+        "type": audit.type,
+    }
 
 @app.get("/")
 async def root():
-    return {"message": "TenderIQ API is running"}
+    return {"message": "Resume Evaluator API is running"}
 
 @app.get("/tenders")
 def get_tenders(db: Session = Depends(get_db)):
-    return db.query(models.Tender).all()
+    return [serialize_tender(t) for t in db.query(models.Tender).all()]
 
 @app.get("/tenders/{tender_id}/criteria")
 def get_criteria(tender_id: str, db: Session = Depends(get_db)):
-    return db.query(models.Criterion).filter(models.Criterion.tender_id == tender_id).all()
+    return [serialize_criterion(c) for c in db.query(models.Criterion).filter(models.Criterion.tender_id == tender_id).all()]
 
 @app.get("/bidders")
 def get_bidders(db: Session = Depends(get_db)):
-    return db.query(models.Bidder).all()
+    return [serialize_bidder(b) for b in db.query(models.Bidder).all()]
 
 @app.get("/evaluations/{bidder_id}")
 def get_evaluations(bidder_id: str, db: Session = Depends(get_db)):
-    return db.query(models.Evaluation).filter(models.Evaluation.bidder_id == bidder_id).all()
+    return [serialize_evaluation(e) for e in db.query(models.Evaluation).filter(models.Evaluation.bidder_id == bidder_id).all()]
 
 @app.get("/tenders/{tender_id}/summary")
 def get_tender_summary(tender_id: str, db: Session = Depends(get_db)):
@@ -105,7 +221,7 @@ def sign_tender(tender_id: str, officer_name: str, db: Session = Depends(get_db)
 
 @app.get("/audit")
 def get_audit(db: Session = Depends(get_db)):
-    return db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()
+    return [serialize_audit_log(a) for a in db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()]
 
 @app.put("/evaluations/{eval_id}")
 def update_evaluation(eval_id: int, verdict: str, db: Session = Depends(get_db)):
@@ -163,7 +279,8 @@ async def upload_tender(
     db: Session = Depends(get_db)
 ):
     tender_id = f"T-{uuid.uuid4().hex[:4].upper()}"
-    file_path = os.path.join(UPLOAD_DIR, "tenders", f"{tender_id}_{file.filename}")
+    filename = file.filename or f"tender_{uuid.uuid4().hex}.pdf"
+    file_path = os.path.join(UPLOAD_DIR, "tenders", f"{tender_id}_{filename}")
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     
     with open(file_path, "wb") as buffer:
@@ -196,7 +313,7 @@ async def upload_tender(
     db.add(models.AuditLog(user="System (AI)", action="extraction", entity=f"Tender {tender_id}", details=f"Extracted {len(ai_data.get('criteria', []))} criteria from document.", type="action"))
     db.commit()
     db.refresh(tender)
-    return tender
+    return serialize_tender(tender)
 
 @app.post("/bidders/upload")
 async def upload_bidder(
@@ -208,18 +325,21 @@ async def upload_bidder(
     bidder_id = f"B-{uuid.uuid4().hex[:4].upper()}"
     saved_files = []
     file_hashes = {}
+    filenames: list[str] = []
     
     bidder_dir = os.path.join(UPLOAD_DIR, "bidders", bidder_id)
     os.makedirs(bidder_dir, exist_ok=True)
     
     for file in files:
-        file_path = os.path.join(bidder_dir, file.filename)
+        filename = file.filename or f"bidder_{uuid.uuid4().hex}.pdf"
+        file_path = os.path.join(bidder_dir, filename)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         saved_files.append(file_path)
-        file_hashes[file.filename] = calculate_hash(file_path)
+        file_hashes[filename] = calculate_hash(file_path)
+        filenames.append(filename)
     
-    bidder = models.Bidder(id=bidder_id, tender_id=tender_id, name=name, status="parsing", documents=[f.filename for f in files], file_hashes=file_hashes)
+    bidder = models.Bidder(id=bidder_id, tender_id=tender_id, name=name, status="parsing", documents=filenames, file_hashes=file_hashes)
     db.add(bidder)
     db.commit()
 
@@ -271,59 +391,64 @@ async def upload_bidder(
     db.add(models.AuditLog(user="System (AI)", action="evaluation", entity=f"Bidder {bidder_id}", details=f"Evaluated {total_criteria} criteria. Result: {bidder.match_score}% match.", type="action"))
     db.commit()
     db.refresh(bidder)
-    return bidder
+    return serialize_bidder(bidder)
 
-# Keep seed for quick setup but use it sparingly
-@app.post("/seed")
-def seed_data(db: Session = Depends(get_db)):
-    db.query(models.Evaluation).delete()
-    db.query(models.Bidder).delete()
-    db.query(models.Criterion).delete()
-    db.query(models.Tender).delete()
-    db.query(models.AuditLog).delete()
-    
-    t1 = models.Tender(id="CRPF-CONST-2024", title="Construction of Tier-3 Data Center & Residential Complex", department="CRPF — Procurement Wing", status="evaluated", value="₹12.5 Cr", 
-                       required_docs=["GST Registration", "ISO 9001:2015", "Audited Balance Sheets (3 yrs)", "PAN Card", "MSME Certificate"])
-    db.add(t1)
+@app.delete("/tenders/{tender_id}")
+def delete_tender(tender_id: str, db: Session = Depends(get_db)):
+    tender = db.query(models.Tender).filter(models.Tender.id == tender_id).first()
+    if not tender:
+        raise HTTPException(status_code=404, detail="Tender not found")
+
+    db.query(models.Evaluation).filter(models.Evaluation.bidder_id.in_(
+        db.query(models.Bidder.id).filter(models.Bidder.tender_id == tender_id)
+    )).delete(synchronize_session=False)
+    db.query(models.Bidder).filter(models.Bidder.tender_id == tender_id).delete(synchronize_session=False)
+    db.query(models.Criterion).filter(models.Criterion.tender_id == tender_id).delete(synchronize_session=False)
+    db.delete(tender)
+
+    db.add(models.AuditLog(user="system", action="delete", entity=f"Tender {tender_id}", details=f"Deleted tender and all related bidders, criteria and evaluations.", type="action"))
     db.commit()
-    
-    c1 = models.Criterion(id="C1", tender_id="CRPF-CONST-2024", category="Financial", name="Minimum Annual Turnover", threshold="> ₹5 Crore", mandatory=True, source_page=12, source_text="The bidder must demonstrate an average annual turnover of not less than ₹5 Crores...")
-    c2 = models.Criterion(id="C2", tender_id="CRPF-CONST-2024", category="Technical", name="Similar Project Experience", threshold="≥ 3 projects in last 5 years", mandatory=True, source_page=14, source_text="Bidder must have completed 3 similar construction projects...")
-    c3 = models.Criterion(id="C3", tender_id="CRPF-CONST-2024", category="Compliance", name="GST Registration", threshold="Valid GSTIN Certificate", mandatory=True, source_page=5, source_text="Possession of valid GST registration is mandatory.")
-    c4 = models.Criterion(id="C4", tender_id="CRPF-CONST-2024", category="Compliance", name="ISO 9001 Certification", threshold="Valid Quality Certificate", mandatory=True, source_page=8, source_text="Bidder must possess valid ISO 9001:2015 certification.")
-    db.add(c1)
-    db.add(c2)
-    db.add(c3)
-    db.add(c4)
-    
-    b1 = models.Bidder(id="B-LT", tender_id="CRPF-CONST-2024", name="L&T Construction", status="parsed", match_score=100.0, documents=["Balance_Sheet.pdf", "ISO_Cert.jpg"],
-                       checklist_status={"GST Registration": "found", "ISO 9001:2015": "found", "Audited Balance Sheets (3 yrs)": "found", "PAN Card": "found", "MSME Certificate": "found"})
-    db.add(b1)
+    return {"message": f"Tender {tender_id} deleted successfully"}
+
+@app.delete("/bidders/{bidder_id}")
+def delete_bidder(bidder_id: str, db: Session = Depends(get_db)):
+    bidder = db.query(models.Bidder).filter(models.Bidder.id == bidder_id).first()
+    if not bidder:
+        raise HTTPException(status_code=404, detail="Bidder not found")
+
+    db.query(models.Evaluation).filter(models.Evaluation.bidder_id == bidder_id).delete(synchronize_session=False)
+    db.delete(bidder)
+
+    db.add(models.AuditLog(user="system", action="delete", entity=f"Bidder {bidder_id}", details=f"Deleted bidder and all related evaluations.", type="action"))
     db.commit()
-    
-    b2 = models.Bidder(id="B-GA", tender_id="CRPF-CONST-2024", name="GMR Infrastructure", status="parsed", match_score=75.0, documents=["GMR_Fin.pdf"],
-                       checklist_status={"GST Registration": "found", "ISO 9001:2015": "missing", "Audited Balance Sheets (3 yrs)": "found", "PAN Card": "found", "MSME Certificate": "found"})
-    db.add(b2)
+    return {"message": f"Bidder {bidder_id} deleted successfully"}
+
+@app.delete("/evaluations/{eval_id}")
+def delete_evaluation(eval_id: int, db: Session = Depends(get_db)):
+    evaluation = db.query(models.Evaluation).filter(models.Evaluation.id == eval_id).first()
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="Evaluation not found")
+
+    bidder = db.query(models.Bidder).filter(models.Bidder.id == evaluation.bidder_id).first()
+    db.delete(evaluation)
+
+    if bidder:
+        remaining = db.query(models.Evaluation).filter(models.Evaluation.bidder_id == bidder.id).all()
+        eligible_count = sum(1 for e in remaining if e.verdict == "eligible")
+        bidder.match_score = (eligible_count / len(remaining)) * 100 if remaining else None
+
+        mandatory_fails = db.query(models.Evaluation).join(models.Criterion).filter(
+            models.Evaluation.bidder_id == bidder.id,
+            models.Criterion.mandatory == True,
+            models.Evaluation.verdict == "ineligible"
+        ).count()
+        bidder.is_disqualified = mandatory_fails > 0
+        if not bidder.is_disqualified:
+            bidder.disqualification_reason = None
+
+    db.add(models.AuditLog(user="system", action="delete", entity=f"Evaluation {eval_id}", details=f"Deleted evaluation and recalculated bidder score.", type="action"))
     db.commit()
-    
-    db.add(models.Evaluation(bidder_id="B-GA", criterion_id="C1", verdict="eligible", confidence="medium", match_type="semantic", extracted_value="₹8.1 Cr", reasoning="Turnover found in annual report.", source_page=2, source_document="GMR_Fin.pdf"))
-    
-    db.add(models.Evaluation(
-        bidder_id="B-LT", 
-        criterion_id="C1", 
-        verdict="eligible", 
-        confidence="high", 
-        match_type="direct", 
-        extracted_value="₹14.2 Cr (Avg)", 
-        reasoning="Turnover figures extracted from audited Balance Sheet 2021-2023.", 
-        source_page=4,
-        source_document="Balance_Sheet.pdf",
-        evidence_snippet="The average turnover for the period 2021-2023 is calculated as ₹14.2 Crores based on figures on Page 4.",
-        action_required="None"
-    ))
-    db.add(models.AuditLog(user="System", action="seed", entity="Database", details="Database seeded with sample CRPF data.", type="action"))
-    db.commit()
-    return {"message": "CRPF Data Seeded Successfully"}
+    return {"message": f"Evaluation {eval_id} deleted successfully"}
 
 if __name__ == "__main__":
     uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
